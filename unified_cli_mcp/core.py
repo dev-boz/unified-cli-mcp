@@ -29,6 +29,17 @@ def _clean_text(text: str) -> str:
     return ANSI_ESCAPE_RE.sub("", text).strip()
 
 
+def _env_flag_enabled(name: str) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _dangerous_flags_enabled() -> bool:
+    return _env_flag_enabled("UNIFIED_CLI_ALLOW_DANGEROUS")
+
+
 def _stringify_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=True)
 
@@ -362,9 +373,11 @@ def _gemini_command(prompt: str, model: str | None, cwd: str | None) -> list[str
 
 
 def _codex_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
-    cmd = ["codex", "exec", "--skip-git-repo-check", "--full-auto", "--ephemeral", "--json"]
+    cmd = ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "--json"]
     if cwd:
         cmd.extend(["-C", cwd])
+    if _dangerous_flags_enabled():
+        cmd.append("--full-auto")
     if model:
         cmd.extend(["-m", model])
     cmd.append(prompt)
@@ -378,8 +391,9 @@ def _claude_command(prompt: str, model: str | None, cwd: str | None) -> list[str
         "--output-format",
         "text",
         "--no-session-persistence",
-        "--dangerously-skip-permissions",
     ]
+    if _dangerous_flags_enabled():
+        cmd.append("--dangerously-skip-permissions")
     if cwd:
         cmd.extend(["--add-dir", cwd])
     if model:
@@ -389,7 +403,9 @@ def _claude_command(prompt: str, model: str | None, cwd: str | None) -> list[str
 
 
 def _kiro_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
-    cmd = ["kiro-cli", "chat", prompt, "--no-interactive", "--trust-all-tools"]
+    cmd = ["kiro-cli", "chat", prompt, "--no-interactive"]
+    if _dangerous_flags_enabled():
+        cmd.append("--trust-all-tools")
     if model:
         cmd.extend(["--model", model])
     return cmd
@@ -410,12 +426,13 @@ def _copilot_command(prompt: str, model: str | None, cwd: str | None) -> list[st
         "copilot",
         "-p",
         prompt,
-        "--allow-all",
         "-s",
         "--no-color",
         "--reasoning-effort",
         "high",
     ]
+    if _dangerous_flags_enabled():
+        cmd.append("--allow-all")
     if cwd:
         cmd.extend(["--add-dir", cwd])
     if model:
@@ -449,9 +466,9 @@ def _cursor_command(prompt: str, model: str | None, cwd: str | None) -> list[str
         "--output-format",
         "stream-json",
         "--force",
-        "--approve-mcps",
-        "--trust",
     ]
+    if _dangerous_flags_enabled():
+        cmd.extend(["--approve-mcps", "--trust"])
     if cwd:
         cmd.extend(["--workspace", cwd])
     if model:
@@ -466,7 +483,7 @@ def _qodo_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
         "--ci",
         "--yes",
         "--silent",
-        "--permissions=rw",
+        "--permissions=rwx" if _dangerous_flags_enabled() else "--permissions=r",
         "--tools=shell,git,filesystem",
     ]
     if cwd:
@@ -478,7 +495,9 @@ def _qodo_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
 
 
 def _amp_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
-    cmd = ["amp", "-x", prompt, "--dangerously-allow-all", "--stream-json", "--no-color"]
+    cmd = ["amp", "-x", prompt, "--stream-json", "--no-color"]
+    if _dangerous_flags_enabled():
+        cmd.append("--dangerously-allow-all")
     if model:
         cmd.extend(["--mode", model])
     return cmd
@@ -668,9 +687,18 @@ class LocalCLIExecutor:
         default_timeout: float | None = None,
     ):
         self.which_fn = which_fn or shutil.which
-        self.default_timeout = default_timeout or float(
-            os.getenv("UNIFIED_CLI_DEFAULT_TIMEOUT", "300")
-        )
+        if default_timeout is not None:
+            self.default_timeout = default_timeout
+            return
+
+        try:
+            self.default_timeout = float(os.getenv("UNIFIED_CLI_DEFAULT_TIMEOUT", "300"))
+        except ValueError:
+            logger.warning(
+                "Invalid UNIFIED_CLI_DEFAULT_TIMEOUT=%r, falling back to 300s",
+                os.getenv("UNIFIED_CLI_DEFAULT_TIMEOUT"),
+            )
+            self.default_timeout = 300.0
 
     async def discover_backends(
         self,
@@ -699,7 +727,13 @@ class LocalCLIExecutor:
     ) -> str:
         command = spec.build_command(prompt, model, cwd)
         effective_timeout = timeout or self.default_timeout
-        logger.info("Running backend=%s cmd=%s", spec.name, " ".join(command))
+        logger.info(
+            "Running backend=%s argv0=%s cwd=%s prompt_len=%d",
+            spec.name,
+            command[0],
+            cwd or os.getcwd(),
+            len(prompt),
+        )
         env = None
         temp_dir: tempfile.TemporaryDirectory[str] | None = None
 
@@ -776,18 +810,19 @@ class LocalCLIExecutor:
 
         config_path = temp_home / "config.toml"
         config_text = config_path.read_text() if config_path.exists() else ""
+        quoted_model = json.dumps(model)
 
         if re.search(r"(?m)^\s*active_model\s*=", config_text):
             config_text = re.sub(
                 r"(?m)^\s*active_model\s*=.*$",
-                f'active_model = "{model}"',
+                f"active_model = {quoted_model}",
                 config_text,
                 count=1,
             )
         else:
             if config_text and not config_text.endswith("\n"):
                 config_text += "\n"
-            config_text += f'active_model = "{model}"\n'
+            config_text += f"active_model = {quoted_model}\n"
 
         config_path.write_text(config_text)
 

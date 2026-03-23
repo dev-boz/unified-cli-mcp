@@ -1,18 +1,29 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 from unified_cli_mcp.core import (
     DEFAULT_ENABLED_BACKENDS,
+    LocalCLIExecutor,
     SUPPORTED_BACKENDS,
     UnifiedCLICore,
     _detect_semantic_error,
+    _dangerous_flags_enabled,
+    _copilot_command,
+    _cursor_command,
+    _claude_command,
+    _codex_command,
+    _kiro_command,
+    _qodo_command,
+    _amp_command,
     _parse_event_stream_output,
     _parse_kiro_output,
     _parse_structured_output,
     extract_text_response,
     parse_enabled_backends,
 )
+from unified_cli_mcp.server import _to_mcp_result
 
 
 class FakeExecutor:
@@ -115,6 +126,52 @@ def test_detect_semantic_error_handles_json_errors_and_qodo_sunset():
 def test_backend_defaults_match_known_working_models():
     assert SUPPORTED_BACKENDS["kiro"].default_model == "claude-sonnet-4.5"
     assert SUPPORTED_BACKENDS["opencode"].default_model == "opencode/big-pickle"
+
+
+def test_dangerous_flags_are_opt_in(monkeypatch):
+    monkeypatch.delenv("UNIFIED_CLI_ALLOW_DANGEROUS", raising=False)
+    assert _dangerous_flags_enabled() is False
+    assert "--full-auto" not in _codex_command("test", None, None)
+    assert "--dangerously-skip-permissions" not in _claude_command("test", None, None)
+    assert "--trust-all-tools" not in _kiro_command("test", None, None)
+    assert "--allow-all" not in _copilot_command("test", None, None)
+    assert "--approve-mcps" not in _cursor_command("test", None, None)
+    assert "--dangerously-allow-all" not in _amp_command("test", None, None)
+    assert "--permissions=r" in _qodo_command("test", None, None)
+
+    monkeypatch.setenv("UNIFIED_CLI_ALLOW_DANGEROUS", "1")
+    assert _dangerous_flags_enabled() is True
+    assert "--full-auto" in _codex_command("test", None, None)
+    assert "--dangerously-skip-permissions" in _claude_command("test", None, None)
+    assert "--trust-all-tools" in _kiro_command("test", None, None)
+    assert "--allow-all" in _copilot_command("test", None, None)
+    assert "--approve-mcps" in _cursor_command("test", None, None)
+    assert "--dangerously-allow-all" in _amp_command("test", None, None)
+    assert "--permissions=rwx" in _qodo_command("test", None, None)
+
+
+def test_invalid_default_timeout_falls_back_to_300(monkeypatch):
+    monkeypatch.setenv("UNIFIED_CLI_DEFAULT_TIMEOUT", "not-a-number")
+    executor = LocalCLIExecutor()
+    assert executor.default_timeout == 300.0
+
+
+def test_to_mcp_result_preserves_is_error_and_structured_content():
+    result = SimpleNamespace(text="boom", is_error=True, structured_content={"x": 1})
+
+    class FakeTextContent:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeCallToolResult:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    converted = _to_mcp_result(FakeCallToolResult, FakeTextContent, result)
+
+    assert converted.kwargs["isError"] is True
+    assert converted.kwargs["structuredContent"] == {"x": 1}
+    assert converted.kwargs["content"][0].kwargs == {"type": "text", "text": "boom"}
 
 
 def test_discover_backends_filters_to_enabled_support():

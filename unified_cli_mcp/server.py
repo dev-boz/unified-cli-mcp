@@ -24,7 +24,7 @@ def _import_mcp_runtime():
     try:
         from mcp.server import Server
         from mcp.server.stdio import stdio_server
-        from mcp.types import TextContent, Tool
+        from mcp.types import CallToolResult, TextContent, Tool
     except ModuleNotFoundError as exc:
         if exc.name == "mcp":
             raise RuntimeError(
@@ -33,7 +33,7 @@ def _import_mcp_runtime():
             ) from exc
         raise
 
-    return Server, stdio_server, TextContent, Tool
+    return Server, stdio_server, CallToolResult, TextContent, Tool
 
 
 def _to_mcp_tool(tool_cls, spec: ToolSpec):
@@ -44,9 +44,17 @@ def _to_mcp_tool(tool_cls, spec: ToolSpec):
     )
 
 
+def _to_mcp_result(call_tool_result_cls, text_content_cls, result):
+    return call_tool_result_cls(
+        content=[text_content_cls(type="text", text=result.text)],
+        structuredContent=result.structured_content,
+        isError=result.is_error,
+    )
+
+
 def create_mcp_server(core: UnifiedCLICore):
     """Build the MCP SDK server around the core runtime."""
-    server_cls, stdio_server, text_content_cls, tool_cls = _import_mcp_runtime()
+    server_cls, stdio_server, call_tool_result_cls, text_content_cls, tool_cls = _import_mcp_runtime()
 
     server = server_cls(
         "unified-cli-mcp",
@@ -62,9 +70,9 @@ def create_mcp_server(core: UnifiedCLICore):
         return [_to_mcp_tool(tool_cls, spec) for spec in core.list_tool_specs()]
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict | None) -> list:
+    async def call_tool(name: str, arguments: dict | None):
         result = await core.execute_tool(name, arguments)
-        return [text_content_cls(type="text", text=result.text)]
+        return _to_mcp_result(call_tool_result_cls, text_content_cls, result)
 
     return server, stdio_server
 

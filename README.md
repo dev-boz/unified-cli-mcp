@@ -133,7 +133,8 @@ Project-local Copilot config: `.mcp.json`
       ],
       "env": {
         "UNIFIED_CLI_ENABLED_BACKENDS": "gemini,codex,claude,copilot,cursor,mistral",
-        "UNIFIED_CLI_DEFAULT_TIMEOUT": "300"
+        "UNIFIED_CLI_DEFAULT_TIMEOUT": "300",
+        "UNIFIED_CLI_ALLOW_DANGEROUS": "1"
       }
     }
   }
@@ -161,6 +162,7 @@ Call the ask tool with backend="cursor", prompt="Suggest a refactor plan for the
 - The target CLI must already be installed and authenticated on the machine where this MCP server runs.
 - This server is standalone. It does not require `cli-agent-nexus`.
 - Backend aliases like `claude-code`, `mistral-vibe`, and `cursor-agent` are normalized internally.
+- Broad permission-bypass flags are now opt-in. Set `UNIFIED_CLI_ALLOW_DANGEROUS=1` only if you explicitly want bridged CLIs to run with their trust/auto-approve modes enabled.
 
 ## Development
 

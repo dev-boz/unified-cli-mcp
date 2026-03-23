@@ -65,7 +65,27 @@ uv run unified-cli-mcp
 
 ## MCP client config
 
-### Generic stdio config
+### Claude Code
+
+```bash
+claude mcp add -s user unified-cli-mcp -- uvx --from git+https://github.com/dev-boz/unified-cli-mcp unified-cli-mcp
+```
+
+### Codex
+
+```bash
+codex mcp add unified-cli-mcp -- uvx --from git+https://github.com/dev-boz/unified-cli-mcp unified-cli-mcp
+```
+
+### Gemini CLI
+
+```bash
+gemini mcp add -s user unified-cli-mcp uvx --from git+https://github.com/dev-boz/unified-cli-mcp unified-cli-mcp
+```
+
+### Copilot CLI
+
+User config file: `~/.copilot/mcp-config.json`
 
 ```json
 {
@@ -82,12 +102,41 @@ uv run unified-cli-mcp
 }
 ```
 
-### Optional environment
+Project-local Copilot config: `.mcp.json`
 
 ```json
 {
-  "UNIFIED_CLI_ENABLED_BACKENDS": "gemini,codex,claude,copilot,cursor,mistral",
-  "UNIFIED_CLI_DEFAULT_TIMEOUT": "300"
+  "servers": {
+    "unified-cli-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/dev-boz/unified-cli-mcp",
+        "unified-cli-mcp"
+      ]
+    }
+  }
+}
+```
+
+### Generic stdio config
+
+```json
+{
+  "mcpServers": {
+    "unified-cli-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/dev-boz/unified-cli-mcp",
+        "unified-cli-mcp"
+      ],
+      "env": {
+        "UNIFIED_CLI_ENABLED_BACKENDS": "gemini,codex,claude,copilot,cursor,mistral",
+        "UNIFIED_CLI_DEFAULT_TIMEOUT": "300"
+      }
+    }
+  }
 }
 ```
 

@@ -7,7 +7,7 @@ Date: 2026-03-23
 Standalone MCP server that exposes local coding CLIs as one universal tool for Claude Code or any other MCP client.
 
 Current backends:
-`gemini`, `codex`, `claude`, `kiro`, `kilo`, `copilot`, `opencode`, `mistral`, `cursor`, `amp`
+`gemini`, `codex`, `claude`, `kiro`, `kilo`, `copilot`, `opencode`, `mistral`, `cursor`, `amp`, `qwen`
 
 Tools:
 - `ask(backend, prompt, model?, cwd?, timeout?)` — run one local CLI in headless mode

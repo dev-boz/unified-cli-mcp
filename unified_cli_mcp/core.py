@@ -503,6 +503,17 @@ def _amp_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
     return cmd
 
 
+def _qwen_command(prompt: str, model: str | None, cwd: str | None) -> list[str]:
+    cmd = ["qwen", "-p", prompt, "--output-format", "text"]
+    if _dangerous_flags_enabled():
+        cmd.append("--yolo")
+    if cwd:
+        cmd.extend(["--include-directories", cwd])
+    if model:
+        cmd.extend(["-m", model])
+    return cmd
+
+
 @dataclass(frozen=True)
 class BackendSpec:
     """Static metadata for a supported local CLI backend."""
@@ -634,6 +645,15 @@ SUPPORTED_BACKENDS: dict[str, BackendSpec] = {
         output_parser=_parse_event_stream_output,
         aliases=("amp-cli",),
     ),
+    "qwen": BackendSpec(
+        name="qwen",
+        binary="qwen",
+        default_model="qwen3-coder-plus",
+        description="Ask Qwen Code directly via the Qwen CLI.",
+        build_command=_qwen_command,
+        output_parser=_parse_plain_output,
+        aliases=("qwen-code", "qwen-cli", "qwen-code-cli"),
+    ),
 }
 
 DEFAULT_ENABLED_BACKENDS = (
@@ -647,6 +667,7 @@ DEFAULT_ENABLED_BACKENDS = (
     "mistral",
     "cursor",
     "amp",
+    "qwen",
 )
 
 BACKEND_ALIASES: dict[str, str] = {}

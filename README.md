@@ -19,6 +19,7 @@ Working in live smoke tests on this machine:
 - `opencode`
 - `mistral`
 - `cursor`
+- `qwen`
 
 Known exclusions:
 - `qodo`: excluded for now because upstream execution currently returns a sunset response

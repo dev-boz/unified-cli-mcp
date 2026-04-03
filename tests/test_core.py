@@ -16,6 +16,7 @@ from unified_cli_mcp.core import (
     _codex_command,
     _kiro_command,
     _qodo_command,
+    _qwen_command,
     _amp_command,
     _parse_event_stream_output,
     _parse_kiro_output,
@@ -61,8 +62,10 @@ def test_parse_enabled_backends_filters_unknown_names_and_normalizes_aliases():
         "mistral",
         "cursor",
     ]
+    assert parse_enabled_backends("qwen-code,qwen-code-cli") == ["qwen"]
     assert parse_enabled_backends("") == list(DEFAULT_ENABLED_BACKENDS)
     assert "qodo" not in DEFAULT_ENABLED_BACKENDS
+    assert "qwen" in DEFAULT_ENABLED_BACKENDS
 
 
 def test_extract_text_response_reads_anthropic_content():
@@ -126,6 +129,7 @@ def test_detect_semantic_error_handles_json_errors_and_qodo_sunset():
 def test_backend_defaults_match_known_working_models():
     assert SUPPORTED_BACKENDS["kiro"].default_model == "claude-sonnet-4.5"
     assert SUPPORTED_BACKENDS["opencode"].default_model == "opencode/big-pickle"
+    assert SUPPORTED_BACKENDS["qwen"].default_model == "qwen3-coder-plus"
 
 
 def test_dangerous_flags_are_opt_in(monkeypatch):
@@ -138,6 +142,7 @@ def test_dangerous_flags_are_opt_in(monkeypatch):
     assert "--approve-mcps" not in _cursor_command("test", None, None)
     assert "--dangerously-allow-all" not in _amp_command("test", None, None)
     assert "--permissions=r" in _qodo_command("test", None, None)
+    assert "--yolo" not in _qwen_command("test", None, None)
 
     monkeypatch.setenv("UNIFIED_CLI_ALLOW_DANGEROUS", "1")
     assert _dangerous_flags_enabled() is True
@@ -148,6 +153,7 @@ def test_dangerous_flags_are_opt_in(monkeypatch):
     assert "--approve-mcps" in _cursor_command("test", None, None)
     assert "--dangerously-allow-all" in _amp_command("test", None, None)
     assert "--permissions=rwx" in _qodo_command("test", None, None)
+    assert "--yolo" in _qwen_command("test", None, None)
 
 
 def test_invalid_default_timeout_falls_back_to_300(monkeypatch):
